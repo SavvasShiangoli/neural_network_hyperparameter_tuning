@@ -248,7 +248,7 @@ def train_with_seed(learning_rate, batch_size, num_epochs, seed, epoch_df):
 
         # Save every 5 epochs = saftey encase the model get's interrupted
         if (epoch + 1) % 5 == 0:
-            epoch_df.to_csv("results/epochdata_bs32-96_lr0.01-0.05_hyper_cosineanneal.csv")
+            epoch_df.to_csv("results/epochdata_bs32-96_lr0.001-0.5_hyper_cosineanneal.csv")
             print(f"Checkpoint saved at epoch {epoch + 1}")
 
         print(f"Train Accuracy: {train_acc:.2f}%, Train Loss: {train_loss:.4f}")
@@ -312,7 +312,7 @@ for learning_rate in learning_rates:
         summary_df.loc[learning_rate, f'bs{batch_size}_test_loss_std'] = metrics['std_test_loss']
 
         # Save summary data to a seperate file
-        summary_df.to_csv("results/summary_bs32-96_lr0.01-0.05_hyper_cosineanneal.csv")
+        summary_df.to_csv("results/summary_bs32-96_lr0.001-0.5_hyper_cosineanneal.csv")
 
         
         print(f"Train: {metrics['mean_train_accuracy']:.2f}% ± {metrics['std_train_accuracy']:.2f}%, Loss: {metrics['mean_train_loss']:.4f} ± {metrics['std_train_loss']:.4f}")
