@@ -9,6 +9,7 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
+import config_test as config
 
 class NN(nn.Module):  # NN inherits from PyTorch's nn.Module
     def __init__(self, dropout_rate):
@@ -58,7 +59,7 @@ class NN(nn.Module):  # NN inherits from PyTorch's nn.Module
         return accuracy.item(), avg_loss
 
 # Set the seeds for cross validation
-seeds = [42, 123, 456, 789, 999]
+seeds = config.SEEDS
 
 # Create results directory
 Path("results").mkdir(exist_ok=True)
@@ -76,49 +77,20 @@ def set_seed(seed):
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 print(f"Using {device} device")
 
-# Hyperparameters
-learning_rates = [0.001, 0.01, 0.05, 0.1, 0.5] # strength of backpropagation
-batch_sizes = [32, 64, 96] # Split of each epoch into mini batches
-num_epochs = 42 # Number of times the data is used in training
-momentum = 0 # Momentum uses previous gradients as additional terms in calculating step size
-dropout = 0 # probability a neuron will be zeroed
+# Global Hyperparameters
+momentum = config.HYPERPARAMETERS['momentum'] # Momentum uses previous gradients as additional terms in calculating step size
+dropout = config.HYPERPARAMETERS['dropout'] # probability a neuron will be zeroed
 
-# Early Stop Conditions
-train_test_gap_threshold = 0.5 # greater than this = too much overfitting
-min_train_gradient = 0.05 # less than this for 
-min_train_gradient_epochs = 5 # Number of epochs to allow breakout before detecting plateu
+# Early Stop Parameters
+train_test_gap_threshold = config.EARLY_STOPPING['train_test_gap_threshold'] # greater than this = too much overfitting
+min_train_gradient = config.EARLY_STOPPING['min_train_gradient'] # less than this for 
+min_train_gradient_epochs = config.EARLY_STOPPING['min_train_gradient_epochs'] # Number of epochs to allow breakout before detecting plateu
 
-# Initialise the summary dataframe
-summary_columns = []
-for batch_size in batch_sizes:
-    summary_columns.extend([
-        f'bs{batch_size}_train_acc_mean', f'bs{batch_size}_train_acc_std',
-        f'bs{batch_size}_train_loss_mean', f'bs{batch_size}_train_loss_std',
-        f'bs{batch_size}_test_acc_mean', f'bs{batch_size}_test_acc_std',
-        f'bs{batch_size}_test_loss_mean', f'bs{batch_size}_test_loss_std'
-    ])
-
-summary_df = pd.DataFrame(index=learning_rates, columns=summary_columns)
-summary_df.index.name = 'learning_rate'
-
-# Initialise the epoch dataframe
-epoch_columns = []
-
-for lr in learning_rates:
-    for batch_size in batch_sizes:
-        for seed in seeds:
-            epoch_columns.extend([
-                f'lr{lr}_bs{batch_size}_seed{seed}_train_acc', 
-                f'lr{lr}_bs{batch_size}_seed{seed}_train_loss',
-                f'lr{lr}_bs{batch_size}_seed{seed}_test_acc', 
-                f'lr{lr}_bs{batch_size}_seed{seed}_test_loss'
-            ])
-
-epoch_df = pd.DataFrame(index=range(1, num_epochs+1), columns=epoch_columns)
-epoch_df.index.name = 'epoch'
+# Dataframes and experiment ids for storing and saving the data
+summary_df, epoch_df, exp_ids = config.create_summary_dataframes()
 
 
-def train_with_seed(learning_rate, batch_size, num_epochs, seed, epoch_df):
+def train_with_seed(learning_rate, batch_size, num_epochs, seed, epoch_df, exp_id):
     # Set the seed before the model is initialised
     set_seed(seed)
 
@@ -157,8 +129,8 @@ def train_with_seed(learning_rate, batch_size, num_epochs, seed, epoch_df):
 
         # If epochs = 6 create first moving average data value from epochs 1-5 - won't be used until epoch 7
         if epoch == 5:
-            train_moving_av_n2 = epoch_df.loc[epoch-5:epoch, f'lr{learning_rate}_bs{batch_size}_seed{seed}_train_acc'].mean()
-            test_moving_av_n2 = epoch_df.loc[epoch-5:epoch, f'lr{learning_rate}_bs{batch_size}_seed{seed}_test_acc'].mean()
+            train_moving_av_n2 = epoch_df.loc[epoch-5:epoch, f'{exp_id}_seed{seed}_train_acc'].mean()
+            test_moving_av_n2 = epoch_df.loc[epoch-5:epoch, f'{exp_id}_seed{seed}_test_acc'].mean()
 
         # If epochs > 7 start to utlise the proportional and gradient based attenuation of the learning rate
         if epoch >= 6:
@@ -168,8 +140,8 @@ def train_with_seed(learning_rate, batch_size, num_epochs, seed, epoch_df):
             test_moving_av_n1 = test_moving_av_n2
 
             # Calculate the new 5 epoch moving average
-            train_moving_av_n2 = epoch_df.loc[epoch-5:epoch, f'lr{learning_rate}_bs{batch_size}_seed{seed}_train_acc'].mean()
-            test_moving_av_n2 = epoch_df.loc[epoch-5:epoch, f'lr{learning_rate}_bs{batch_size}_seed{seed}_test_acc'].mean()
+            train_moving_av_n2 = epoch_df.loc[epoch-5:epoch, f'{exp_id}_seed{seed}_train_acc'].mean()
+            test_moving_av_n2 = epoch_df.loc[epoch-5:epoch, f'{exp_id}_seed{seed}_test_acc'].mean()
 
             # Break Case 1 - Check if the train_test_gap is greater than the threshold
             train_test_gap = train_moving_av_n2 - test_moving_av_n2
@@ -241,14 +213,14 @@ def train_with_seed(learning_rate, batch_size, num_epochs, seed, epoch_df):
         test_acc, test_loss = model.check_accuracy(test_loader, criterion)
 
         # Save epoch data to the datframe
-        epoch_df.loc[epoch+1, f'lr{learning_rate}_bs{batch_size}_seed{seed}_train_acc'] = train_acc
-        epoch_df.loc[epoch+1, f'lr{learning_rate}_bs{batch_size}_seed{seed}_train_loss'] = train_loss
-        epoch_df.loc[epoch+1, f'lr{learning_rate}_bs{batch_size}_seed{seed}_test_acc'] = test_acc
-        epoch_df.loc[epoch+1, f'lr{learning_rate}_bs{batch_size}_seed{seed}_test_loss'] = test_loss
+        epoch_df.loc[epoch+1, f'{exp_id}_seed{seed}_train_acc'] = train_acc
+        epoch_df.loc[epoch+1, f'{exp_id}_seed{seed}_train_loss'] = train_loss
+        epoch_df.loc[epoch+1, f'{exp_id}_seed{seed}_test_acc'] = test_acc
+        epoch_df.loc[epoch+1, f'{exp_id}_seed{seed}_test_loss'] = test_loss
 
         # Save every 5 epochs = saftey encase the model get's interrupted
         if (epoch + 1) % 5 == 0:
-            epoch_df.to_csv("results/epochdata_bs32-96_lr0.001-0.5_hyper_cosineanneal.csv")
+            epoch_df.to_csv("results/epochdata_config_split.csv")
             print(f"Checkpoint saved at epoch {epoch + 1}")
 
         print(f"Train Accuracy: {train_acc:.2f}%, Train Loss: {train_loss:.4f}")
@@ -265,11 +237,11 @@ def train_with_seed(learning_rate, batch_size, num_epochs, seed, epoch_df):
     return (final_train_acc, final_train_loss), (final_test_acc, final_test_loss)
 
 
-def evaluate_hyperparameters(learning_rate, batch_size, num_epochs, seeds, epoch_df):
+def evaluate_hyperparameters(learning_rate, batch_size, num_epochs, seeds, epoch_df, exp_id):
     train_results = []
     test_results = []
     for seed in seeds:
-        (train_acc, train_loss), (test_acc, test_loss) = train_with_seed(learning_rate, batch_size, num_epochs, seed, epoch_df)
+        (train_acc, train_loss), (test_acc, test_loss) = train_with_seed(learning_rate, batch_size, num_epochs, seed, epoch_df, exp_id)
         train_results.append((train_acc, train_loss))
         test_results.append((test_acc, test_loss))
 
@@ -296,25 +268,31 @@ def evaluate_hyperparameters(learning_rate, batch_size, num_epochs, seeds, epoch
 print("Starting hyperparameter search...")
 print("=" * 50)
 
-for learning_rate in learning_rates:
-    for batch_size in batch_sizes:
-        print(f"\nTesting LR: {learning_rate}, Batch Size: {batch_size}")
-        metrics = evaluate_hyperparameters(learning_rate, batch_size, num_epochs, seeds, epoch_df)
+combinations = config.get_search_combinations()
 
-        # Adding the data to the summary dataframe 
-        summary_df.loc[learning_rate, f'bs{batch_size}_train_acc_mean'] = metrics['mean_train_accuracy']
-        summary_df.loc[learning_rate, f'bs{batch_size}_train_acc_std'] = metrics['std_train_accuracy']
-        summary_df.loc[learning_rate, f'bs{batch_size}_train_loss_mean'] = metrics['mean_train_loss']
-        summary_df.loc[learning_rate, f'bs{batch_size}_train_loss_std'] = metrics['std_train_loss']
-        summary_df.loc[learning_rate, f'bs{batch_size}_test_acc_mean'] = metrics['mean_test_accuracy']
-        summary_df.loc[learning_rate, f'bs{batch_size}_test_acc_std'] = metrics['std_test_accuracy']
-        summary_df.loc[learning_rate, f'bs{batch_size}_test_loss_mean'] = metrics['mean_test_loss']
-        summary_df.loc[learning_rate, f'bs{batch_size}_test_loss_std'] = metrics['std_test_loss']
+for combination, exp_id in zip(combinations, exp_ids):
+    learning_rate = combination['learning_rate']
+    batch_size = combination['batch_size']
+    num_epochs = combination['num_epochs']
 
-        # Save summary data to a seperate file
-        summary_df.to_csv("results/summary_bs32-96_lr0.001-0.5_hyper_cosineanneal.csv")
+    print(f"\nTesting LR: {learning_rate}, Batch Size: {batch_size}")
 
-        
-        print(f"Train: {metrics['mean_train_accuracy']:.2f}% ± {metrics['std_train_accuracy']:.2f}%, Loss: {metrics['mean_train_loss']:.4f} ± {metrics['std_train_loss']:.4f}")
-        print(f"Test:  {metrics['mean_test_accuracy']:.2f}% ± {metrics['std_test_accuracy']:.2f}%, Loss: {metrics['mean_test_loss']:.4f} ± {metrics['std_test_loss']:.4f}")
-        print("-" * 40)
+    metrics = evaluate_hyperparameters(learning_rate, batch_size, num_epochs, seeds, epoch_df, exp_id)
+
+    # Adding the data to the summary dataframe 
+    summary_df.loc[0, f'{exp_id}_train_acc_mean'] = metrics['mean_train_accuracy']
+    summary_df.loc[0, f'{exp_id}_train_acc_std'] = metrics['std_train_accuracy']
+    summary_df.loc[0, f'{exp_id}_train_loss_mean'] = metrics['mean_train_loss']
+    summary_df.loc[0, f'{exp_id}_train_loss_std'] = metrics['std_train_loss']
+    summary_df.loc[0, f'{exp_id}_test_acc_mean'] = metrics['mean_test_accuracy']
+    summary_df.loc[0, f'{exp_id}_test_acc_std'] = metrics['std_test_accuracy']
+    summary_df.loc[0, f'{exp_id}_test_loss_mean'] = metrics['mean_test_loss']
+    summary_df.loc[0, f'{exp_id}_test_loss_std'] = metrics['std_test_loss']
+
+    # Save summary data to a seperate file
+    summary_df.to_csv("results/summary_config_split.csv")
+
+    print(f"Train: {metrics['mean_train_accuracy']:.2f}% ± {metrics['std_train_accuracy']:.2f}%, Loss: {metrics['mean_train_loss']:.4f} ± {metrics['std_train_loss']:.4f}")
+    print(f"Test:  {metrics['mean_test_accuracy']:.2f}% ± {metrics['std_test_accuracy']:.2f}%, Loss: {metrics['mean_test_loss']:.4f} ± {metrics['std_test_loss']:.4f}")
+    print("-" * 40)
+
