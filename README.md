@@ -46,9 +46,26 @@ Experiments Coming Up:
 
 ## Future Improvements
 Code Structure:
-- Modularize into separate files (model, training, evaluation) enabling easier experiment planning and adaptability of the code. 
-- Extend to architecture search - including layers, optimizer, activation function
+- Extend refactoring to architecture search - including layers, optimizer, activation function
 - Add visualisation of the results = bar charts, line graphs and heatmaps 
+
+## Change Log
+
+### Refactoring Progress (16th September 2025)
+- Separated configuration into `config_test.py` for better modularity
+- Dynamic experiment ID generation based on search parameters
+- Flexible hyperparameter combinations using `itertools`
+- Improved dataframe structure for any parameter combination
+
+### What Changed
+- Configuration and experiment setup now separate from training logic
+- Can easily add/remove hyperparameters in config file
+- Automatic handling of fixed vs search parameters
+- More maintainable and extensible codebase
+
+### Next Steps
+- Extract model definition to separate file
+- Create experiment comparison and visualization module for results
 
 ## Usage 
 ```bash
