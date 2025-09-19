@@ -6,17 +6,24 @@ SEEDS = [42, 123, 456, 789, 999]
 
 # Define which architectures will run
 ARCHITECTURES = {
-    # Width vs Depth with Funnel Design (decreasing)
+     # Width vs Depth with Funnel Design (decreasing)
     "1_layer_wide": [784, 50, 10],                    # 49,462 params
-    "2_layer_funnel": [784, 48, 35, 10],              # 49,646 params 
+    "2_layer_funnel": [784, 48, 35, 10],              # 49,646 params  
+    "3_layer_funnel": [784, 47, 34, 27, 10],          # 49,892 params
+    "4_layer_funnel": [784, 47, 33, 25, 18, 10],      # 49,944 params
+    
+    # Constant Width Design (same hidden size)
+    "2_layer_constant": [784, 47, 47, 10],            # 49,760 params
+    "3_layer_constant": [784, 45, 45, 45, 10],        # 49,240 params  
+    "4_layer_constant": [784, 43, 43, 43, 43, 10],    # 49,455 params
 }
 
 # Paramaters which effect the learning of the model
 HYPERPARAMETERS = {
-    'learning_rate': 0.1,
-    'batch_size': 32,
+    'learning_rate':0.01,
+    'batch_size':[32, 64, 96],
     'num_epochs':42,
-    'momentum':[0.8, 0.9],
+    'momentum':[0, 0.2, 0.4, 0.6, 0.8],
     'dropout':0 
 }
 

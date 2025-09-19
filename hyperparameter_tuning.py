@@ -9,27 +9,35 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
-import config_test as config
+import config
 
 class NN(nn.Module):  # NN inherits from PyTorch's nn.Module
-    def __init__(self, dropout_rate):
+    def __init__(self, dropout_rate, architecture):
         super(NN, self).__init__() 
 
-        self.flatten = nn.Flatten() # Explicitly flattens the layer
-        self.fc1 = nn.Linear(784, 48)    # Automatically creates self.fc1.weights, self.fc1.biases
-        self.fc2 = nn.Linear(48, 35)   # Automatically creates self.fc2.weights, self.fc2.biases
-        self.fc3 = nn.Linear(35, 10)   # Automatically creates self.fc2.weights, self.fc2.biases
+        # Flattens multidimensional data into 1D to feed in to the neural network
+        self.flatten = nn.Flatten()
 
-        # Single Dropout Layer that can be reused
+        # Single dropout layer that can be reused across all hidden layers
         self.dropout = nn.Dropout(p=dropout_rate)
 
+        # Build layers from architecture
+        self.layers = nn.ModuleList()
+        for i in range(len(architecture) - 1):
+            self.layers.append(nn.Linear(architecture[i], architecture[i + 1]))
+
     def forward(self, x):
-        x = self.flatten(x) # flattens the data
-        x = F.relu(self.fc1(x)) # applies ReLU at the hidden layer
-        x = self.dropout(x) # applies dropout after the hidden layer
-        x = F.relu(self.fc2(x)) # applies ReLU at the hidden layer
-        x = self.dropout(x) # applies dropout after the hidden layer
-        x = self.fc3(x)
+        
+        # Flatten incoming data to 1D
+        x = self.flatten(x)
+
+        # Apply ReLU + dropout to all layers except the last
+        for layer in self.layers[:-1]:
+            x = F.relu(layer(x))
+            x = self.dropout(x)
+        
+        # Apply final layer without activation (raw logits for classification and entropy loss function)
+        x = self.layers[-1](x)
 
         return x
     
@@ -94,7 +102,7 @@ min_train_gradient_epochs = config.EARLY_STOPPING['min_train_gradient_epochs'] #
 summary_df, epoch_df, exp_ids = config.create_summary_dataframes()
 
 
-def train_with_seed(learning_rate, batch_size, momentum, num_epochs, seed, epoch_df, exp_id):
+def train_with_seed(architecture, learning_rate, batch_size, momentum, num_epochs, seed, epoch_df, exp_id):
     # Set the seed before the model is initialised
     set_seed(seed)
 
@@ -108,7 +116,7 @@ def train_with_seed(learning_rate, batch_size, momentum, num_epochs, seed, epoch
     test_loader = DataLoader(dataset=test_data, batch_size=batch_size, shuffle=True)
 
     # Initialise the network
-    model = NN(dropout_rate=dropout).to(device) # Initialise the network to the device
+    model = NN(dropout_rate=dropout, architecture=architecture).to(device) # Initialise the network to the device
 
     # Loss function and optimizer
     criterion = nn.CrossEntropyLoss()
@@ -224,7 +232,7 @@ def train_with_seed(learning_rate, batch_size, momentum, num_epochs, seed, epoch
 
         # Save every 5 epochs = saftey encase the model get's interrupted
         if (epoch + 1) % 5 == 0:
-            epoch_df.to_csv("results/epochdata_arch_test1.csv")
+            epoch_df.to_csv("results/epochdata_arch_test2.csv")
             print(f"Checkpoint saved at epoch {epoch + 1}")
 
         print(f"Train Accuracy: {train_acc:.2f}%, Train Loss: {train_loss:.4f}")
@@ -241,11 +249,11 @@ def train_with_seed(learning_rate, batch_size, momentum, num_epochs, seed, epoch
     return (final_train_acc, final_train_loss), (final_test_acc, final_test_loss)
 
 
-def evaluate_hyperparameters(learning_rate, batch_size, momentum, num_epochs, seeds, epoch_df, exp_id):
+def evaluate_hyperparameters(architecture, learning_rate, batch_size, momentum, num_epochs, seeds, epoch_df, exp_id):
     train_results = []
     test_results = []
     for seed in seeds:
-        (train_acc, train_loss), (test_acc, test_loss) = train_with_seed(learning_rate, batch_size, momentum, num_epochs, seed, epoch_df, exp_id)
+        (train_acc, train_loss), (test_acc, test_loss) = train_with_seed(architecture, learning_rate, batch_size, momentum, num_epochs, seed, epoch_df, exp_id)
         train_results.append((train_acc, train_loss))
         test_results.append((test_acc, test_loss))
 
@@ -283,7 +291,7 @@ for combination, exp_id in zip(combinations, exp_ids):
 
     print(f"\nTesting Architecture: {combination['architecture']}, Learning Rate: {learning_rate}, Momentum: {momentum}, Batch Size: {batch_size}")
 
-    metrics = evaluate_hyperparameters(learning_rate, batch_size, momentum, num_epochs, seeds, epoch_df, exp_id)
+    metrics = evaluate_hyperparameters(architecture, learning_rate, batch_size, momentum, num_epochs, seeds, epoch_df, exp_id)
 
     # Adding the data to the summary dataframe 
     summary_df.loc['train_acc_mean', f'{exp_id}'] = metrics['mean_train_accuracy']
@@ -296,7 +304,7 @@ for combination, exp_id in zip(combinations, exp_ids):
     summary_df.loc['test_loss_std', f'{exp_id}'] = metrics['std_test_loss']
 
     # Save summary data to a seperate file
-    summary_df.to_csv("results/summary_arch_test1.csv")
+    summary_df.to_csv("results/summary_arch_test2.csv")
 
     print(f"Train: {metrics['mean_train_accuracy']:.2f}% ± {metrics['std_train_accuracy']:.2f}%, Loss: {metrics['mean_train_loss']:.4f} ± {metrics['std_train_loss']:.4f}")
     print(f"Test:  {metrics['mean_test_accuracy']:.2f}% ± {metrics['std_test_accuracy']:.2f}%, Loss: {metrics['mean_test_loss']:.4f} ± {metrics['std_test_loss']:.4f}")
