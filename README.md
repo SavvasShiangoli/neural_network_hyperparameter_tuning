@@ -22,7 +22,7 @@ tunnels, different activation functions and optimizers.
 Following this the neural netowrk will then go into optimsiation refinement introducing momentum and then
 looking at the connection with batch size.
 
-After this regularisation through drop out will be introduced which can unlock more complex archtectures
+After this regularisation through dropout will be introduced which can unlock more complex archtectures
 which naturally overfit.
 
 ## Key Features
@@ -35,18 +35,19 @@ which naturally overfit.
 ## Experiments Covered
 Experiments Completed:
 - Learning rates: [0.001, 0.01, 0.05, 0.1, 0.05] vs Batch Size: [32, 64, 96]
-- Early stopping thresholds for plaetu detection [0.1% and 0.05%]
+- Early stopping thresholds for plateau detection [0.1% and 0.05%]
 - Effect of early stopping on the accuracy performance and test-train gap
 - Learning Rate attenuation methods both custom and cosine annealing and the effect on accuracy and test-train gap
+- Architecture Optimzation = hiden layers(1-4), layer width(finnel v constant)
 
 Experiments Coming Up:
-- Architecture Optimisation = hidden layers(1-4), layer width (funnel vs constant), activations (LeakyReLU), optimizers (adam)
+- Architecture Optimisation = activations (LeakyReLU), optimizers (adam)
 - Momentum vs batch rate tuning for refinement
-- Drop out for unlocking complex architectures and models which tend to overfit
+- Dropout for unlocking complex architectures and models which tend to overfit
 
 ## Future Improvements
 Code Structure:
-- Extend refactoring to architecture search - including layers, optimizer, activation function
+- Extend refactoring to architecture search - optimizer, activation function
 - Add visualisation of the results = bar charts, line graphs and heatmaps 
 
 ## Change Log
@@ -65,6 +66,21 @@ Code Structure:
 
 ### Next Steps
 - Extract model definition to separate file
+- Create experiment comparison and visualization module for results
+
+### Refactoring Progress (19th September 2025)
+- Neural Network architecture definition has been moved to the config file
+- Updated summary_df format to be more user friendly with exp_id only for columns
+- Added momentum and architecture to the search combinations
+
+### What Changed
+- Mutiple architectures with different hidden layer design can now be set in the config file
+- Momentum has been added to the combinations loop and can now be cycled over
+- Summary_df has been reformatted to have exp_id for columns and averages, stds etc as rows for better userbility
+- Network class within hyperparameter_tuning.py is updated to automatically create the netowrk based on the config file
+- config_test.py has been renamed to config.py removing additional step used before for troubleshooting
+
+### Next Steps
 - Create experiment comparison and visualization module for results
 
 ## Usage 
