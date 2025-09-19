@@ -4,12 +4,19 @@ import pandas as pd
 # For cross validation and statistical analysis for the model
 SEEDS = [42, 123, 456, 789, 999]
 
+# Define which architectures will run
+ARCHITECTURES = {
+    # Width vs Depth with Funnel Design (decreasing)
+    "1_layer_wide": [784, 50, 10],                    # 49,462 params
+    "2_layer_funnel": [784, 48, 35, 10],              # 49,646 params 
+}
+
 # Paramaters which effect the learning of the model
 HYPERPARAMETERS = {
-    'learning_rate': [1, 0.01, 0.05, 0.1, 0.5],
-    'batch_size': [32, 64, 96],
+    'learning_rate': 0.1,
+    'batch_size': 32,
     'num_epochs':42,
-    'momentum':0,
+    'momentum':[0.8, 0.9],
     'dropout':0 
 }
 
@@ -31,6 +38,13 @@ def get_search_combinations():
     search_params = {}
     fixed_params = {}
     
+    # Indenitfy if multiple architectures are searched over and assign to search or fixed parameters
+    if len(ARCHITECTURES.keys()) > 1:
+        search_params['architecture'] = list(ARCHITECTURES.keys())
+    else:
+        fixed_params['architecture'] = list(ARCHITECTURES.keys())
+
+    # Identify which hyperparamaters have multiple entries and should be search or fixed paramaters
     for param_name, param_value in HYPERPARAMETERS.items():
         if isinstance(param_value, list) and len(param_value) > 1:
             search_params[param_name] = param_value
@@ -76,23 +90,21 @@ def create_summary_dataframes():
     for combination in combinations:
         exp_id_parts = []
         # Pulls out only the paramaters which are being searched over to include in the experiment identifier
+        if len(ARCHITECTURES.keys()) > 1:
+            value = combination['architecture']
+            exp_id_parts.append(f"architecture{value}")
+
         for param_name, param_value in HYPERPARAMETERS.items():
             if isinstance(param_value, list) and len(param_value) > 1:
                 value = combination[param_name]
                 exp_id_parts.append(f"{param_name}{value}")
 
-        # join the parts into a single string
+        # join the parts into a single string and append the columnn
         exp_id = "_".join(exp_id_parts)
         exp_ids.append(exp_id)
-    
-        # Extends the columns using the experiment ID and the following extensions
-        summary_columns.extend([
-                f'{exp_id}_train_acc_mean', f'{exp_id}_train_acc_std',
-                f'{exp_id}_train_loss_mean', f'{exp_id}_train_loss_std',
-                f'{exp_id}_test_acc_mean', f'{exp_id}_test_acc_std',
-                f'{exp_id}_test_loss_mean', f'{exp_id}_test_loss_std'
-            ])
-        
+        summary_columns.append(exp_id)
+
+        # Create the column names for the epochs --> each path is seperate there keep seeds seperate
         for seed in SEEDS:
             epoch_columns.extend([
                 f'{exp_id}_seed{seed}_train_acc', 
@@ -102,8 +114,16 @@ def create_summary_dataframes():
             ])
     
     # Create the dataframes from the columns and epochs
-    summary_df = pd.DataFrame(columns=summary_columns)
+    summary_df = pd.DataFrame(columns=summary_columns, 
+                              index=['train_acc_mean', 'train_acc_std', 'train_loss_mean', 'train_loss_std',
+                                     'test_acc_mean', 'test_acc_std', 'test_loss_mean', 'test_loss_std'])
+    summary_df.index.name = 'performance_metrics'
+
     epoch_df = pd.DataFrame(index=range(1, num_epochs+1), columns=epoch_columns)
     epoch_df.index.name = 'epoch'
 
     return summary_df, epoch_df, exp_ids
+
+print(len(ARCHITECTURES['1_layer_wide']))
+
+
